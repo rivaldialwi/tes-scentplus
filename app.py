@@ -16,7 +16,7 @@ nltk.download('stopwords')
 nltk.download('punkt')
 
 # Membaca model yang sudah dilatih dan TF-IDF Vectorizer
-@st.cache_resource
+@st.cache(allow_output_mutation=True)
 def load_model_and_vectorizer():
     model = joblib.load("model100.pkl")
     vectorizer = joblib.load("tfidf_vectorizer.pkl")
@@ -61,12 +61,12 @@ def fetch_data():
     return rows
 
 # Fungsi untuk mengonversi DataFrame ke Excel
-@st.cache_data
+@st.cache(allow_output_mutation=True)
 def convert_df_to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='Sheet1')
-        writer.close()
+        writer.save()
     processed_data = output.getvalue()
     return processed_data
 
@@ -74,7 +74,7 @@ def convert_df_to_excel(df):
 def run():
     st.title("Aplikasi Analisis Sentimen Scentplus")
 
-    tab1, tab2 = st.tabs(["Prediksi Satu Kalimat", "Prediksi File"])
+    tab1, tab2 = st.columns(2)
 
     with tab1:
         st.header("Masukkan kalimat untuk analisis sentimen:")
@@ -103,13 +103,16 @@ def run():
             gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=10)
             gridOptions = gb.build()
 
-            AgGrid(
-                df,
-                gridOptions=gridOptions,
-                enable_enterprise_modules=True,
-                height=400,
-                fit_columns_on_grid_load=True
-            )
+            try:
+                AgGrid(
+                    df,
+                    gridOptions=gridOptions,
+                    enable_enterprise_modules=True,
+                    height=400,
+                    fit_columns_on_grid_load=True
+                )
+            except Exception as e:
+                st.error(f"Error menampilkan AgGrid: {e}")
             
             # Tombol untuk mengunduh data sebagai file Excel
             st.download_button(
