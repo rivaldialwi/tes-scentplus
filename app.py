@@ -9,13 +9,14 @@ from nltk.tokenize import word_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from datetime import datetime
 from io import BytesIO
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 # Mengunduh resource stopwords jika belum ada
 nltk.download('stopwords')
 nltk.download('punkt')
 
 # Membaca model yang sudah dilatih dan TF-IDF Vectorizer
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def load_model_and_vectorizer():
     model = joblib.load("model100.pkl")
     vectorizer = joblib.load("tfidf_vectorizer.pkl")
@@ -60,11 +61,12 @@ def fetch_data():
     return rows
 
 # Fungsi untuk mengonversi DataFrame ke Excel
-@st.cache(allow_output_mutation=True)
+@st.cache_data
 def convert_df_to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='Sheet1')
+        writer.close()
     processed_data = output.getvalue()
     return processed_data
 
@@ -72,7 +74,7 @@ def convert_df_to_excel(df):
 def run():
     st.title("Aplikasi Analisis Sentimen Scentplus")
 
-    tab1, tab2 = st.columns(2)
+    tab1, tab2 = st.tabs(["Prediksi Satu Kalimat", "Prediksi File"])
 
     with tab1:
         st.header("Masukkan kalimat untuk analisis sentimen:")
@@ -96,11 +98,26 @@ def run():
             df = pd.DataFrame(data, columns=['id', 'Text', 'sentiment', 'date'])
             df.rename(columns={'sentiment': 'Human'}, inplace=True)
             
-            st.dataframe(df)
+            # Konfigurasi AgGrid
+            gb = GridOptionsBuilder.from_dataframe(df)
+            gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=10)
+            gridOptions = gb.build()
+
+            AgGrid(
+                df,
+                gridOptions=gridOptions,
+                enable_enterprise_modules=True,
+                height=400,
+                fit_columns_on_grid_load=True
+            )
             
             # Tombol untuk mengunduh data sebagai file Excel
-            st.markdown("### Unduh data sebagai file Excel")
-            st.markdown(get_download_link(df), unsafe_allow_html=True)
+            st.download_button(
+                label="Unduh data sebagai file Excel",
+                data=convert_df_to_excel(df),
+                file_name="data_sentimen.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
         else:
             st.write("Tidak ada data yang tersedia.")
 
@@ -122,21 +139,17 @@ def run():
                 df['Human'] = logreg_model.predict(X_tfidf)
                 
                 # Tampilkan prediksi
-                st.dataframe(df)
+                st.write(df)
                 
                 # Buat tombol unduh
-                st.markdown("### Unduh file dengan prediksi")
-                st.markdown(get_download_link(df), unsafe_allow_html=True)
+                st.download_button(
+                    label="Unduh file dengan prediksi",
+                    data=convert_df_to_excel(df),
+                    file_name="prediksi_sentimen.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
             else:
                 st.error("File harus memiliki kolom 'Text'.")
-
-def get_download_link(df):
-    """Generate a link allowing the data in a given panda dataframe to be downloaded"""
-    output = BytesIO()
-    excel_file = convert_df_to_excel(df)
-    b64 = base64.b64encode(excel_file).decode()
-    href = f'<a href="data:file/xlsx;base64,{b64}" download="data_sentimen.xlsx">Unduh file Excel</a>'
-    return href
 
 if __name__ == "__main__":
     run()
