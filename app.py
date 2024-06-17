@@ -78,6 +78,9 @@ def run():
         st.header("Masukkan kalimat untuk analisis sentimen:")
         input_text = st.text_input("Masukkan kalimat")
     
+        if 'data' not in st.session_state:
+            st.session_state['data'] = fetch_data()
+
         if st.button("Analisis"):
             if input_text.strip() == "":
                 st.error("Tolong masukkan kalimat terlebih dahulu.")
@@ -85,9 +88,10 @@ def run():
                 result = classify_text(input_text)
                 st.write("Hasil Analisis Sentimen:", result)
                 insert_to_db(input_text, result)
+                st.session_state['data'] = fetch_data()
     
         # Menampilkan data dari database sebagai tabel dengan pagination
-        data = fetch_data()
+        data = st.session_state['data']
         if data:
             df = pd.DataFrame(data, columns=['id', 'Text', 'sentiment', 'date'])
             df.rename(columns={'sentiment': 'Human'}, inplace=True)
@@ -102,7 +106,7 @@ def run():
 
     with tab2:
         st.header("Unggah file untuk Prediksi Sentimen")
-        uploaded_file = st.file_uploader("Unggah file Excel", type=["xlsx"])
+        uploaded_file = st.file_uploader("Unggah file Excel", type=["xlsx"], key="file_uploader")
 
         if uploaded_file is not None:
             # Baca file Excel
